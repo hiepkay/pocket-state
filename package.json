@@ -1,0 +1,14 @@
+{
+  "name": "pocket-state",
+  "version": "0.0.9",
+  "description": "tiny global store",
+  "main": "src/index",
+  "codegenConfig": {
+    "name": "TinystoreSpec",
+    "type": "modules",
+    "jsSrcsDir": "src"
+  },
+  "author": " <@kayda69> (nhh.tcp@gmail.com)",
+  "license": "ISC",
+  "homepage": "#readme"
+}
