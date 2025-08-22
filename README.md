@@ -76,6 +76,10 @@ counterStore.setValue(async s => {
 
 ```bash
 npm install immer
+# or
+yarn add immer
+# or
+pnpm add immer
 ```
 
 ```ts
@@ -145,7 +149,7 @@ import {createStore, createHook} from 'pocket-state';
 interface Counter {
   count: number;
 }
-const counterStore = createStore<Counter>({ count: 0 });
+const counterStore = createStore<Counter>({count: 0});
 
 // 2. Create the custom hook
 const useCounter = createHook(counterStore);
@@ -161,18 +165,21 @@ export function CounterComponent() {
   return (
     <View>
       <Text>Count: {count}</Text>
-      <Button title="Inc" onPress={() => counterStore.setValue(s => ({count: s.count + 1}))} />
+      <Button
+        title="Inc"
+        onPress={() => counterStore.setValue(s => ({count: s.count + 1}))}
+      />
       <Button title="Reset" onPress={reset} />
     </View>
   );
 }
 ```
 
-**Advantages:**  
+**Advantages:**
 
-- **No accidental re-renders** when accessing only API methods.  
-- **Type-safe selectors** and API usage, with full IDE support.  
-- **Simple migration path** for those coming from Zustand or similar libraries.  
+- **No accidental re-renders** when accessing only API methods.
+- **Type-safe selectors** and API usage, with full IDE support.
+- **Simple migration path** for those coming from Zustand or similar libraries.
 
 ---
 
@@ -208,10 +215,10 @@ Lightweight hook built on `useSyncExternalStore` that subscribes to your store a
 
 ### `createHook(store)` (React)
 
-Generates a custom hook for your store.  
+Generates a custom hook for your store.
 
-- `hook()` → store API only, **no re-render**.  
-- `hook(selector)` → `{ value, ...api }`, re-renders when selected state changes.  
+- `hook()` → store API only, **no re-render**.
+- `hook(selector)` → `{ value, ...api }`, re-renders when selected state changes.
 
 ---
 
