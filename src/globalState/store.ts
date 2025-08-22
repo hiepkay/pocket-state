@@ -14,14 +14,8 @@ export function createStore<T>(
 
   const areEqual = equalityFn ?? shallow;
 
-  let emitScheduled = false;
   const emitState = () => {
-    if (emitScheduled) return;
-    emitScheduled = true;
-    queueMicrotask(() => {
-      emitScheduled = false;
-      emitter.emit('state', state);
-    });
+    emitter.emit('state', state);
   };
 
   function baseSet(delta: Partial<T>) {
@@ -31,13 +25,6 @@ export function createStore<T>(
 
     if (!areEqual(state, nextState)) {
       state = nextState;
-
-      if (process.env.NODE_ENV !== 'production') {
-        try {
-          Object.freeze(state as any);
-        } catch {}
-      }
-
       emitState();
     }
   }
@@ -47,14 +34,9 @@ export function createStore<T>(
     baseSet as (patch: Partial<T>) => void,
   );
 
-  const getValue = ((key?: keyof T | (keyof T)[]) => {
-    if (key === undefined) return state;
-    if (Array.isArray(key)) {
-      const out = {} as Pick<T, (typeof key)[number]>;
-      for (const k of key) (out as any)[k] = (state as any)[k];
-      return out;
-    }
-    return (state as any)[key];
+  const getValue = ((key?: keyof T) => {
+    if (!key) return state;
+    return state[key];
   }) as UseStoreGet<T>;
 
   function subscribe(selectorOrListener: any, maybeListener?: any) {
@@ -91,7 +73,7 @@ export function createStore<T>(
     (async () => {
       try {
         const resolved =
-          typeof patch === 'function' ? await (patch as any)(state) : patch;
+          typeof patch === 'function' ? await patch(state) : patch;
 
         if (resolved && typeof resolved === 'object') {
           setFn(resolved as Partial<T>);
@@ -113,17 +95,17 @@ export function createStore<T>(
       }
       const delta = {} as Partial<T>;
       let changed = false;
-      for (const k in nextState as any) {
-        const nv = (nextState as any)[k];
-        const ov = (state as any)[k];
+      for (const k in nextState) {
+        const nv = nextState[k];
+        const ov = state[k];
         if (nv !== ov) {
-          (delta as any)[k] = nv;
+          delta[k] = nv;
           changed = true;
         }
       }
-      for (const k in state as any) {
+      for (const k in state) {
         if (!(k in (nextState as any))) {
-          (delta as any)[k] = undefined;
+          delta[k] = undefined;
           changed = true;
         }
       }
@@ -172,7 +154,7 @@ export function createStore<T>(
       return (state as any).slice();
     }
     if (state && typeof state === 'object') {
-      return {...(state as any)};
+      return {...state};
     }
     return state;
   }

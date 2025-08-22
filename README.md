@@ -225,3 +225,5 @@ Generates a custom hook for your store.
 ## 📜 License
 
 MIT — use it however you like.
+
+keywords: pocket-state, state-management, react, react-native, typescript, hooks, store

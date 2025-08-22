@@ -1,5 +1,6 @@
 import {createStore} from './globalState/store';
 import {useStore} from './globalState/hooks';
+import {createHook} from './globalState/create';
 import type {
   IEventEmitter,
   Listener,
@@ -10,7 +11,7 @@ import type {
   Store,
 } from './globalState/type';
 
-export {createStore, useStore};
+export {createStore, useStore, createHook};
 export type {
   IEventEmitter,
   Listener,
