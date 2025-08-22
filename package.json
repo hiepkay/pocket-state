@@ -1,6 +1,6 @@
 {
   "name": "pocket-state",
-  "version": "0.0.9",
+  "version": "0.1.2",
   "description": "tiny global store",
   "main": "src/index",
   "codegenConfig": {
@@ -9,6 +9,7 @@
     "jsSrcsDir": "src"
   },
   "author": " <@kayda69> (nhh.tcp@gmail.com)",
-  "license": "ISC",
-  "homepage": "#readme"
+  "license": "MIT",
+  "homepage": "https://github.com/hiepkay/pocket-state",
+  "readme": "https://github.com/hiepkay/pocket-state#readme"
 }
