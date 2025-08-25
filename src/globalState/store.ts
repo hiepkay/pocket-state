@@ -10,7 +10,12 @@ export function createStore<T>(
   equalityFn?: (a: any, b: any) => boolean,
 ): Store<T> {
   const emitter: IEventEmitter = new EventEmitter();
-  let state = initialState;
+  const _initialState = Array.isArray(initialState)
+    ? (initialState as any).slice()
+    : initialState && typeof initialState === 'object'
+    ? {...initialState}
+    : initialState;
+  let state = _initialState;
 
   const areEqual = equalityFn ?? shallow;
 
@@ -35,7 +40,7 @@ export function createStore<T>(
   );
 
   const getValue = ((key?: keyof T) => {
-    if (!key) return state;
+    if (key === undefined) return state;
     return state[key];
   }) as UseStoreGet<T>;
 
@@ -70,18 +75,20 @@ export function createStore<T>(
   function setValue(
     patch: Partial<T> | ((state: T) => Partial<T> | Promise<Partial<T>>),
   ): void {
-    (async () => {
-      try {
-        const resolved =
-          typeof patch === 'function' ? await patch(state) : patch;
-
-        if (resolved && typeof resolved === 'object') {
-          setFn(resolved as Partial<T>);
-        }
-      } catch (error) {
-        console.warn('[store.setValue] patch error:', error);
+    let resolved = typeof patch === 'function' ? patch(state) : patch;
+    if (resolved instanceof Promise) {
+      resolved
+        .then(res => {
+          if (res && typeof res === 'object') {
+            setFn(res as Partial<T>);
+          }
+        })
+        .catch(error => console.warn('[store.setValue] patch error:', error));
+    } else {
+      if (resolved && typeof resolved === 'object') {
+        setFn(resolved as Partial<T>);
       }
-    })();
+    }
   }
 
   function setImmer(updater: (draft: Draft<T>) => void): void {
@@ -95,17 +102,17 @@ export function createStore<T>(
       }
       const delta = {} as Partial<T>;
       let changed = false;
-      for (const k in nextState) {
-        const nv = nextState[k];
-        const ov = state[k];
+      for (const k in nextState as any) {
+        const nv = (nextState as any)[k];
+        const ov = (state as any)[k];
         if (nv !== ov) {
-          delta[k] = nv;
+          (delta as any)[k] = nv;
           changed = true;
         }
       }
-      for (const k in state) {
+      for (const k in state as any) {
         if (!(k in (nextState as any))) {
-          delta[k] = undefined;
+          (delta as any)[k] = undefined;
           changed = true;
         }
       }
@@ -150,22 +157,23 @@ export function createStore<T>(
   }
 
   function getInitialValue(): T {
-    if (Array.isArray(state)) {
-      return (state as any).slice();
+    if (Array.isArray(_initialState)) {
+      return (_initialState as any).slice();
     }
-    if (state && typeof state === 'object') {
-      return {...state};
+    if (_initialState && typeof _initialState === 'object') {
+      return {..._initialState};
     }
-    return state;
+    return _initialState;
   }
 
   function isDirty() {
-    return !areEqual(state, initialState);
+    return !areEqual(state, _initialState);
   }
 
   function getNumberOfSubscriber() {
     return emitter.getNumberOfSubscriber();
   }
+
   return {
     getValue,
     getInitialValue,
