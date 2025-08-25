@@ -104,14 +104,14 @@ export function createStore<T>(
       let changed = false;
       for (const k in nextState as any) {
         const nv = (nextState as any)[k];
-        const ov = (state as any)[k];
+        const ov = state[k];
         if (nv !== ov) {
           (delta as any)[k] = nv;
           changed = true;
         }
       }
-      for (const k in state as any) {
-        if (!(k in (nextState as any))) {
+      for (const k in state) {
+        if (!(k in nextState)) {
           (delta as any)[k] = undefined;
           changed = true;
         }
