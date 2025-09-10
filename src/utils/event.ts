@@ -1,5 +1,5 @@
 // event.ts
-import {IEventEmitter, Listener} from './type';
+import {IEventEmitter, Listener} from '../globalState/type';
 
 export class EventEmitter implements IEventEmitter {
   private events = new Map<string, Set<Listener<any>>>();

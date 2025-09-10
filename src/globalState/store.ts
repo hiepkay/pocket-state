@@ -1,8 +1,11 @@
 // store.ts
 import {IEventEmitter, Listener, Middleware, Store, UseStoreGet} from './type';
-import {EventEmitter} from './event';
+import {EventEmitter} from '../utils/event';
 import {Draft, produce} from 'immer';
-import {shallow} from './shallowEqual';
+import {shallow} from '../utils/shallowEqual';
+import cloneObject from '../utils/cloneObject';
+import isPromise from '../utils/isPromise';
+import isArray from '../utils/isArray';
 
 export function createStore<T>(
   initialState: T,
@@ -10,7 +13,7 @@ export function createStore<T>(
   equalityFn?: (a: any, b: any) => boolean,
 ): Store<T> {
   const emitter: IEventEmitter = new EventEmitter();
-  const _initialState = Array.isArray(initialState)
+  const _initialState = isArray(initialState)
     ? (initialState as any).slice()
     : initialState && typeof initialState === 'object'
     ? {...initialState}
@@ -53,8 +56,8 @@ export function createStore<T>(
       wrapped = (next: T) => {
         const slice = selector(next);
         if (!areEqual(slice, prevSlice)) {
+          maybeListener(prevSlice, slice);
           prevSlice = slice;
-          maybeListener(slice);
         }
       };
     } else {
@@ -62,8 +65,8 @@ export function createStore<T>(
       let prev = state;
       wrapped = (next: T) => {
         if (!areEqual(next, prev)) {
+          listener(prev, next);
           prev = next;
-          listener(next);
         }
       };
     }
@@ -76,7 +79,7 @@ export function createStore<T>(
     patch: Partial<T> | ((state: T) => Partial<T> | Promise<Partial<T>>),
   ): void {
     let resolved = typeof patch === 'function' ? patch(state) : patch;
-    if (resolved instanceof Promise) {
+    if (isPromise(resolved)) {
       resolved
         .then(res => {
           if (res && typeof res === 'object') {
@@ -122,21 +125,13 @@ export function createStore<T>(
     }
   }
 
-  function reset(): void;
-  function reset(initialValue?: T | Partial<T>): void;
   function reset(initialValue?: T | Partial<T>) {
     const isObj = (
       v: unknown,
     ): v is Record<string | symbol | number, unknown> =>
       typeof v === 'object' && v !== null;
 
-    const cloneShallow = <U>(src: U): U => {
-      if (Array.isArray(src)) return (src as any).slice();
-      if (isObj(src)) return {...(src as any)} as U;
-      return src;
-    };
-
-    let next = cloneShallow(initialState) as T;
+    let next = cloneObject(initialState) as T;
     if (initialValue !== undefined) {
       if (Array.isArray(initialValue)) {
         next = (initialValue as any).slice();

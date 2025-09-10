@@ -1,6 +1,6 @@
-import { useMemo } from "react";
-import { useStore } from "./hooks";
-import { Store } from "./type";
+import {useMemo} from 'react';
+import {useStore} from './hooks';
+import {Store} from './type';
 
 /**
  * Creates a custom React hook for a store, giving you access to the store API
@@ -27,14 +27,14 @@ import { Store } from "./type";
  *   2. `useHook(selector)` – Returns `{ value, ...api }` where `value` is the selected state. Re-renders on selected value changes.
  */
 export function createHook<T>(store: Store<T>) {
-  const api = { ...store };
+  const api = {...store};
 
   function useBoundStore(): typeof api;
-  function useBoundStore<S>(selector: (state: T) => S): { value: S } & typeof api;
+  function useBoundStore<S>(selector: (state: T) => S): {value: S} & typeof api;
   function useBoundStore<S = T>(selector?: (state: T) => S) {
     if (!selector) return api;
     const value = useStore(store, selector);
-    return useMemo(() => ({ value, ...api }), [value]);
+    return useMemo(() => ({value, ...api}), [value]);
   }
 
   return useBoundStore;
