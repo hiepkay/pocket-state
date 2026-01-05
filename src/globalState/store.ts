@@ -125,7 +125,23 @@ export function createStore<T>(
     }
   }
 
+    function resetToInitialState() {
+    const cloned = Array.isArray(initialState)
+      ? initialState.slice()
+      : initialState && typeof initialState === 'object'
+      ? {...initialState}
+      : initialState;
+    state = cloned as T;
+    emitState();
+  }
+
   function reset(initialValue?: T | Partial<T>) {
+
+    if(initialState === undefined){
+      resetToInitialState()
+      return;
+    }
+    
     const isObj = (
       v: unknown,
     ): v is Record<string | symbol | number, unknown> =>
