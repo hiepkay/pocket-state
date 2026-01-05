@@ -125,7 +125,7 @@ export function createStore<T>(
     }
   }
 
-    function resetToInitialState() {
+  function resetToInitialState() {
     const cloned = Array.isArray(initialState)
       ? initialState.slice()
       : initialState && typeof initialState === 'object'
@@ -136,12 +136,11 @@ export function createStore<T>(
   }
 
   function reset(initialValue?: T | Partial<T>) {
-
-    if(initialState === undefined){
-      resetToInitialState()
+    if (initialState === undefined) {
+      resetToInitialState();
       return;
     }
-    
+
     const isObj = (
       v: unknown,
     ): v is Record<string | symbol | number, unknown> =>
