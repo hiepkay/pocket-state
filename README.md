@@ -14,6 +14,7 @@ Works seamlessly **inside React** with hooks or **outside React** with a simple 
 - 🔌 Framework-agnostic – Works in plain TS/JS and React.
 - 🛠 Middleware – Logging, persistence, batching, devtools bridges, etc.
 - 🔔 Event Emitter – Subscribe to store and custom events.
+- ⚖️ EqualityFn – Custom comparator (shallow by default, can use deep/custom).
 - ✅ TypeScript-first – Fully type-safe.
 
 ---
@@ -183,16 +184,32 @@ export function CounterComponent() {
 
 ---
 
-## 🎯 Selectors
+## ⚖️ EqualityFn
 
-Selectors let you subscribe to **just part of the state**.
+By default, `createStore` uses a shallow equality function to detect changes.  
+You can override this by providing a custom comparator as the 3rd argument:
 
-```tsx
-function FlagDisplay() {
-  const flag = useStore(counterStore, s => s.flag);
-  return <Text>Flag is {flag ? 'ON' : 'OFF'}</Text>;
+```ts
+import {createStore} from 'pocket-state';
+import deepEqual from 'fast-deep-equal';
+
+interface State {
+  count: number;
+  nested: {a: number; b: number};
 }
+
+// shallow equality (default)
+const store1 = createStore<State>({count: 0, nested: {a: 1, b: 2}});
+
+// deep equality
+const store2 = createStore<State>(
+  {count: 0, nested: {a: 1, b: 2}},
+  [],
+  deepEqual,
+);
 ```
+
+This is useful when working with nested state objects and you want to avoid unnecessary re-renders.
 
 ---
 
@@ -224,4 +241,6 @@ Generates a custom hook for your store.
 
 ## 📜 License
 
-MIT — use it however you like.
+MIT
+
+keywords: pocket-state, state-management, react, react-native, typescript, hooks, store, equalityFn

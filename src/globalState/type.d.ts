@@ -1,14 +1,19 @@
 import {Draft} from 'immer';
 
+interface FileList {
+  readonly length: number;
+  item(index: number): File | null;
+  [index: number]: File;
+}
+
 /**
  * A callback invoked when an event is emitted with a payload of type `T`.
  * Keep listeners pure and fast. Long-running side effects should live in
  * middleware/effects instead of listeners.
  */
-export interface Listener<T = any> {
-  (payload: T): void;
+export interface Listener<T = unknown> {
+  (prev: T, next: T): void;
 }
-
 /**
  * Immer-style mutation function used for "mutable-looking" updates.
  *
@@ -132,6 +137,9 @@ export interface Store<T> {
    */
   setValue(
     patch: Partial<T> | ((state: T) => Partial<T> | Promise<Partial<T>>),
+    patchOptions?: {
+      forced: boolean;
+    },
   ): void;
 
   /**
@@ -200,6 +208,8 @@ export interface Store<T> {
 
   /** Get number of subscriber for current store */
   getNumberOfSubscriber(): number;
+
+  /** */
 }
 
 /**

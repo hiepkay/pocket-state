@@ -1,8 +1,11 @@
 // store.ts
 import {IEventEmitter, Listener, Middleware, Store, UseStoreGet} from './type';
-import {EventEmitter} from './event';
+import {EventEmitter} from '../utils/event';
 import {Draft, produce} from 'immer';
-import {shallow} from './shallowEqual';
+import {shallow} from '../utils/shallowEqual';
+import cloneObject from '../utils/cloneObject';
+import isPromise from '../utils/isPromise';
+import isArray from '../utils/isArray';
 
 export function createStore<T>(
   initialState: T,
@@ -10,18 +13,17 @@ export function createStore<T>(
   equalityFn?: (a: any, b: any) => boolean,
 ): Store<T> {
   const emitter: IEventEmitter = new EventEmitter();
-  let state = initialState;
+  const _initialState = isArray(initialState)
+    ? (initialState as any).slice()
+    : initialState && typeof initialState === 'object'
+    ? {...initialState}
+    : initialState;
+  let state = _initialState;
 
   const areEqual = equalityFn ?? shallow;
 
-  let emitScheduled = false;
   const emitState = () => {
-    if (emitScheduled) return;
-    emitScheduled = true;
-    queueMicrotask(() => {
-      emitScheduled = false;
-      emitter.emit('state', state);
-    });
+    emitter.emit('state', state);
   };
 
   function baseSet(delta: Partial<T>) {
@@ -31,13 +33,6 @@ export function createStore<T>(
 
     if (!areEqual(state, nextState)) {
       state = nextState;
-
-      if (process.env.NODE_ENV !== 'production') {
-        try {
-          Object.freeze(state as any);
-        } catch {}
-      }
-
       emitState();
     }
   }
@@ -47,14 +42,9 @@ export function createStore<T>(
     baseSet as (patch: Partial<T>) => void,
   );
 
-  const getValue = ((key?: keyof T | (keyof T)[]) => {
+  const getValue = ((key?: keyof T) => {
     if (key === undefined) return state;
-    if (Array.isArray(key)) {
-      const out = {} as Pick<T, (typeof key)[number]>;
-      for (const k of key) (out as any)[k] = (state as any)[k];
-      return out;
-    }
-    return (state as any)[key];
+    return state[key];
   }) as UseStoreGet<T>;
 
   function subscribe(selectorOrListener: any, maybeListener?: any) {
@@ -66,8 +56,8 @@ export function createStore<T>(
       wrapped = (next: T) => {
         const slice = selector(next);
         if (!areEqual(slice, prevSlice)) {
+          maybeListener(prevSlice, slice);
           prevSlice = slice;
-          maybeListener(slice);
         }
       };
     } else {
@@ -75,8 +65,8 @@ export function createStore<T>(
       let prev = state;
       wrapped = (next: T) => {
         if (!areEqual(next, prev)) {
+          listener(prev, next);
           prev = next;
-          listener(next);
         }
       };
     }
@@ -87,19 +77,35 @@ export function createStore<T>(
 
   function setValue(
     patch: Partial<T> | ((state: T) => Partial<T> | Promise<Partial<T>>),
+    patchOptions?: {
+      forced?: boolean;
+    },
   ): void {
-    (async () => {
-      try {
-        const resolved =
-          typeof patch === 'function' ? await (patch as any)(state) : patch;
-
-        if (resolved && typeof resolved === 'object') {
-          setFn(resolved as Partial<T>);
-        }
-      } catch (error) {
-        console.warn('[store.setValue] patch error:', error);
+    const apply = (res: Partial<T>) => {
+      if (!res || typeof res !== 'object') return;
+      if (patchOptions?.forced) {
+        state = isArray(state) ? (res as unknown as T) : {...state, ...res};
+        emitState();
+        return;
       }
-    })();
+      setFn(res);
+    };
+
+    try {
+      const resolved = typeof patch === 'function' ? patch(state) : patch;
+
+      if (isPromise(resolved)) {
+        resolved
+          .then(apply)
+          .catch(error =>
+            console.warn('[store.setValue] patch async error:', error),
+          );
+      } else {
+        apply(resolved);
+      }
+    } catch (error) {
+      console.warn('[store.setValue] patch error:', error);
+    }
   }
 
   function setImmer(updater: (draft: Draft<T>) => void): void {
@@ -107,7 +113,7 @@ export function createStore<T>(
       const nextState = produce(state, updater);
       if (areEqual(state, nextState)) return;
 
-      if (Array.isArray(state)) {
+      if (isArray(state)) {
         setFn(nextState as unknown as Partial<T>);
         return;
       }
@@ -115,14 +121,14 @@ export function createStore<T>(
       let changed = false;
       for (const k in nextState as any) {
         const nv = (nextState as any)[k];
-        const ov = (state as any)[k];
+        const ov = state[k];
         if (nv !== ov) {
           (delta as any)[k] = nv;
           changed = true;
         }
       }
-      for (const k in state as any) {
-        if (!(k in (nextState as any))) {
+      for (const k in state) {
+        if (!(k in nextState)) {
           (delta as any)[k] = undefined;
           changed = true;
         }
@@ -133,57 +139,54 @@ export function createStore<T>(
     }
   }
 
-  function reset(): void;
-  function reset(initialValue?: T | Partial<T>): void;
   function reset(initialValue?: T | Partial<T>) {
-    const isObj = (
-      v: unknown,
-    ): v is Record<string | symbol | number, unknown> =>
+    const isObj = (v: unknown): v is Record<any, any> =>
       typeof v === 'object' && v !== null;
 
-    const cloneShallow = <U>(src: U): U => {
-      if (Array.isArray(src)) return (src as any).slice();
-      if (isObj(src)) return {...(src as any)} as U;
-      return src;
-    };
-
-    let next = cloneShallow(initialState) as T;
-    if (initialValue !== undefined) {
-      if (Array.isArray(initialValue)) {
-        next = (initialValue as any).slice();
-      } else if (isObj(initialValue)) {
-        Object.assign(next as any, initialValue);
-      } else {
-        const current = getValue();
-        if (!Object.is(current as any, initialValue as any)) {
-          setFn(initialValue as unknown as Partial<T>);
-        }
-        return;
-      }
+    // 1️⃣ reset() → force về _initialState + force emit
+    if (initialValue === undefined) {
+      const cloned = cloneObject(_initialState) as T;
+      state = cloned;
+      emitState();
+      return;
     }
-    const current = getValue();
-    if (!areEqual(current, next)) {
+
+    // 2️⃣ reset(value) → dựa trên _initialState
+    let next = cloneObject(_initialState) as T;
+
+    if (isArray(initialValue)) {
+      next = initialValue.slice() as T;
+    } else if (isObj(initialValue)) {
+      Object.assign(next as any, initialValue);
+    } else {
+      if (!Object.is(getValue(), initialValue)) {
+        setFn(initialValue as unknown as Partial<T>);
+      }
+      return;
+    }
+    if (!areEqual(getValue(), next)) {
       setFn(next as unknown as Partial<T>);
     }
   }
 
   function getInitialValue(): T {
-    if (Array.isArray(state)) {
-      return (state as any).slice();
+    if (isArray(_initialState)) {
+      return (_initialState as any).slice();
     }
-    if (state && typeof state === 'object') {
-      return {...(state as any)};
+    if (_initialState && typeof _initialState === 'object') {
+      return {..._initialState};
     }
-    return state;
+    return _initialState;
   }
 
   function isDirty() {
-    return !areEqual(state, initialState);
+    return !areEqual(state, _initialState);
   }
 
   function getNumberOfSubscriber() {
     return emitter.getNumberOfSubscriber();
   }
+
   return {
     getValue,
     getInitialValue,
