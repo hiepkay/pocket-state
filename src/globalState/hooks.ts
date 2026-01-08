@@ -2,42 +2,52 @@ import {useCallback, useRef, useSyncExternalStore} from 'react';
 import type {Store} from './type';
 import {shallow} from '../utils/shallowEqual';
 
-type EqualityFn<S> = (a: any, b: any) => boolean;
+type EqualityFn = (a: any, b: any) => boolean;
 
 // Overloads
 export function useStore<T>(store: Store<T>): T;
 export function useStore<T, S>(
   store: Store<T>,
   selector: (state: T) => S,
-  equalityFn?: EqualityFn<S>,
+  equalityFn?: EqualityFn,
 ): S;
 
 export function useStore<T, S = T>(
   store: Store<T>,
   selector?: (state: T) => S,
-  equalityFn: EqualityFn<S> = shallow,
+  equalityFn: (a: S, b: S) => boolean = shallow,
 ): S {
-  const sel = selector ?? ((s: T) => s as unknown as S);
+  const sliceRef = useRef<S | null>(null);
+  const selectorRef = useRef(selector);
+  const equalityRef = useRef(equalityFn);
 
-  const sliceRef = useRef<S>(sel(store.getValue()));
-  const eqFn = selector ? equalityFn : Object.is;
-
-  const subscribe = useCallback((onChange: () => void) => {
-    return store.subscribe(sel, (_prev: S, next: S) => {
-      if (!eqFn(sliceRef.current, next)) {
-        sliceRef.current = next;
-        onChange();
-      }
-    });
-  }, []);
+  selectorRef.current = selector;
+  equalityRef.current = equalityFn;
 
   const getSnapshot = useCallback(() => {
-    const next = sel(store.getValue());
-    if (!eqFn(sliceRef.current, next)) {
+    const state = store.getValue();
+    const next = selectorRef.current
+      ? selectorRef.current(state)
+      : (state as unknown as S);
+
+    if (
+      sliceRef.current === null ||
+      !equalityRef.current(sliceRef.current, next)
+    ) {
       sliceRef.current = next;
     }
+
     return sliceRef.current;
-  }, []);
+  }, [store]);
+
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      return store.subscribe(() => {
+        onChange();
+      });
+    },
+    [store],
+  );
 
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }

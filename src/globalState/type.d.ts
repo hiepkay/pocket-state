@@ -14,7 +14,6 @@ interface FileList {
 export interface Listener<T = unknown> {
   (prev: T, next: T): void;
 }
-
 /**
  * Immer-style mutation function used for "mutable-looking" updates.
  *
@@ -138,6 +137,9 @@ export interface Store<T> {
    */
   setValue(
     patch: Partial<T> | ((state: T) => Partial<T> | Promise<Partial<T>>),
+    patchOptions?: {
+      forced: boolean;
+    },
   ): void;
 
   /**

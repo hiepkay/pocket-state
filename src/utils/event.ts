@@ -20,7 +20,7 @@ export class EventEmitter implements IEventEmitter {
       this.onceWrappers
         .get(event)
         ?.delete(listener as unknown as Listener<any>);
-      listener(payload);
+      listener(payload, payload);
     };
     if (!this.onceWrappers.has(event)) {
       this.onceWrappers.set(event, new Map());
@@ -39,7 +39,7 @@ export class EventEmitter implements IEventEmitter {
     if (!listeners || listeners.size === 0) return;
     for (const l of listeners) {
       try {
-        l(payload);
+        l(payload, payload);
       } catch (error) {
         console.warn(`Error in listener for '${event}':`, error);
       }

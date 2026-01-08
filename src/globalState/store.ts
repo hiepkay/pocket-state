@@ -77,20 +77,34 @@ export function createStore<T>(
 
   function setValue(
     patch: Partial<T> | ((state: T) => Partial<T> | Promise<Partial<T>>),
+    patchOptions?: {
+      forced?: boolean;
+    },
   ): void {
-    let resolved = typeof patch === 'function' ? patch(state) : patch;
-    if (isPromise(resolved)) {
-      resolved
-        .then(res => {
-          if (res && typeof res === 'object') {
-            setFn(res as Partial<T>);
-          }
-        })
-        .catch(error => console.warn('[store.setValue] patch error:', error));
-    } else {
-      if (resolved && typeof resolved === 'object') {
-        setFn(resolved as Partial<T>);
+    const apply = (res: Partial<T>) => {
+      if (!res || typeof res !== 'object') return;
+      if (patchOptions?.forced) {
+        state = isArray(state) ? (res as unknown as T) : {...state, ...res};
+        emitState();
+        return;
       }
+      setFn(res);
+    };
+
+    try {
+      const resolved = typeof patch === 'function' ? patch(state) : patch;
+
+      if (isPromise(resolved)) {
+        resolved
+          .then(apply)
+          .catch(error =>
+            console.warn('[store.setValue] patch async error:', error),
+          );
+      } else {
+        apply(resolved);
+      }
+    } catch (error) {
+      console.warn('[store.setValue] patch error:', error);
     }
   }
 
@@ -99,7 +113,7 @@ export function createStore<T>(
       const nextState = produce(state, updater);
       if (areEqual(state, nextState)) return;
 
-      if (Array.isArray(state)) {
+      if (isArray(state)) {
         setFn(nextState as unknown as Partial<T>);
         return;
       }
@@ -125,49 +139,38 @@ export function createStore<T>(
     }
   }
 
-  function resetToInitialState() {
-    const cloned = Array.isArray(initialState)
-      ? initialState.slice()
-      : initialState && typeof initialState === 'object'
-      ? {...initialState}
-      : initialState;
-    state = cloned as T;
-    emitState();
-  }
-
   function reset(initialValue?: T | Partial<T>) {
-    if (initialState === undefined) {
-      resetToInitialState();
+    const isObj = (v: unknown): v is Record<any, any> =>
+      typeof v === 'object' && v !== null;
+
+    // 1️⃣ reset() → force về _initialState + force emit
+    if (initialValue === undefined) {
+      const cloned = cloneObject(_initialState) as T;
+      state = cloned;
+      emitState();
       return;
     }
 
-    const isObj = (
-      v: unknown,
-    ): v is Record<string | symbol | number, unknown> =>
-      typeof v === 'object' && v !== null;
+    // 2️⃣ reset(value) → dựa trên _initialState
+    let next = cloneObject(_initialState) as T;
 
-    let next = cloneObject(initialState) as T;
-    if (initialValue !== undefined) {
-      if (Array.isArray(initialValue)) {
-        next = (initialValue as any).slice();
-      } else if (isObj(initialValue)) {
-        Object.assign(next as any, initialValue);
-      } else {
-        const current = getValue();
-        if (!Object.is(current as any, initialValue as any)) {
-          setFn(initialValue as unknown as Partial<T>);
-        }
-        return;
+    if (isArray(initialValue)) {
+      next = initialValue.slice() as T;
+    } else if (isObj(initialValue)) {
+      Object.assign(next as any, initialValue);
+    } else {
+      if (!Object.is(getValue(), initialValue)) {
+        setFn(initialValue as unknown as Partial<T>);
       }
+      return;
     }
-    const current = getValue();
-    if (!areEqual(current, next)) {
+    if (!areEqual(getValue(), next)) {
       setFn(next as unknown as Partial<T>);
     }
   }
 
   function getInitialValue(): T {
-    if (Array.isArray(_initialState)) {
+    if (isArray(_initialState)) {
       return (_initialState as any).slice();
     }
     if (_initialState && typeof _initialState === 'object') {
